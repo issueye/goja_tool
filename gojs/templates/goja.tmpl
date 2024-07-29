@@ -1,0 +1,49 @@
+package {{.PackageName}}
+
+{{$pkgName:=(printf "original_%s" .PackageName) -}}
+import (
+	{{$pkgName}} "{{.PackagePath}}"
+)
+
+import (
+	"github.com/dop251/goja"
+	"github.com/issueye/build_magic/backend/code_engine/stand"
+)
+
+var (
+	{{.PackageName}}Module = stand.NewGojaModule("{{.PackageName}}")
+)
+
+func Init{{.PackageName}}() {
+	{{.PackageName}}Module.Set(
+		stand.Objects{
+			{{- $pkgFuncs:=.PackageFuncs}}
+			// Functions
+			{{- range $objName, $objDefine := .PackageFuncs}}
+			"{{$objName}}": {{$pkgName}}.{{$objDefine}},
+			{{- end}}
+
+			// Var and consts
+			{{- range $objName, $objDefine := .PackageVars}}
+			"{{$objName}}": {{$pkgName}}.{{$objDefine}},
+			{{- end}}
+
+			// Types (value type)
+			{{- range $objName, $objDefine := .PackageTypes}}
+			"{{$objName}}": {{printf "func() %s.%s { return %s.%s{} }" $pkgName $objDefine $pkgName $objDefine}},
+			{{- end}}
+
+			// Types (pointer type)
+			{{range $objName, $objDefine := .PackageTypes}}
+			{{- $newObjName := printf "%s%s" "New" $objName -}}
+			{{- if not (exist $pkgFuncs $newObjName) -}}
+			"{{$newObjName}}": {{printf "func() *%s.%s { return &%s.%s{} }" $pkgName $objDefine $pkgName $objDefine}},
+			{{end -}}
+			{{- end -}}
+			},
+		).Register()
+}
+
+func Enable(runtime *goja.Runtime) {
+	{{.PackageName}}Module.Enable(runtime)
+}
